@@ -1,4 +1,3 @@
-# import sys
 import numpy as np
 
 
@@ -9,7 +8,6 @@ async def get_bands_parts(audio, chunk_size: int):
         normalized_arr = amplitude_arr / 32768.0  # PCM16 normalization
 
         yield normalized_arr, c, c.frame_rate
-
 
 
 def main():
@@ -23,7 +21,7 @@ def main():
     res = get_bands_parts(audio_fpath)
 
     for pi, part in enumerate(res, start=1):
-        print(f"Part Num - {pi} | Part data - {part}")
+        logger.debug(f"Part Num - {pi} | Part data - {part}")
 
 
 
