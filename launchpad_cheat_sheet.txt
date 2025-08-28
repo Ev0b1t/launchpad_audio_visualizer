@@ -1,0 +1,38 @@
+# X,Y positions of the buttons (LEDS)
+
+# 0,0 - top line
+# 9,1 - left line
+# 0,9 - bottom line
+# 8,1 - right line
+
+=============================================
+# set one
+# lp.LedCtrlXY(0, 0, 72, 0, 0)
+
+# set the bpm blinking
+# lp.LedCtrlBpm(240)
+
+# # set the blinking modes (bpm uses)
+# lp.LedCtrlPulseByCode(1, 94)
+# lp.LedCtrlFlashByCode(5, 94)
+
+# X,Y positions of the buttons (LEDS)
+
+# CORNERS (1st)
+# 0,0 - top
+# 9,1 - left
+# 0,9 - bottom
+# 8,1 - right
+
+# PADS (1st)
+# 0,1 - 1col 1row
+# 0,8 - 1col Lrow
+
+
+# lp.LedCtrlXY(0,0, RED, GREEN, BLUE)
+
+# lp.LedCtrlXY(0,0, 72, 0, 0)
+# lp.LedCtrlXY(9,1, 72, 0, 0)
+# lp.LedCtrlXY(9,1, 72, 0, 0)
+# lp.LedCtrlXY(0,9, 72, 0, 0)
+# lp.LedCtrlXY(8,1, 72, 0, 0)
