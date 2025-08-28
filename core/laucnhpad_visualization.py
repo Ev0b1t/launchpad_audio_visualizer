@@ -1,9 +1,12 @@
+import asyncio
 from launchpad_py import launchpad
 from core.config import CONFIG
 from core.state import BANDS_POS
 
 
 async def visualize_audio_bands(lp: launchpad.LaunchpadPro, bands_arr):
+    tasks = []
+
     for pad_x, val in enumerate(bands_arr):
         new_level = round(val * CONFIG.pads.PADS_IN_COLUMN)
 
@@ -12,23 +15,29 @@ async def visualize_audio_bands(lp: launchpad.LaunchpadPro, bands_arr):
 
         old_level = BANDS_POS[pad_x]
 
-        if new_level > old_level:
-            # up
-            for y in range(old_level + 1, new_level + 1):
+        if new_level != old_level:
+            # only changed buttons
+            if new_level > old_level:
+                level_from = old_level
+                level_to = new_level
+                level_side = 1
+                # only new buttons
+            else:
+                level_from = new_level
+                level_to = old_level
+                level_side = -1
+                # lights off other
+            for y in range(level_from + 1, level_to + 1):
                 pad_y = CONFIG.pads.PADS_IN_COLUMN - y + 1
-                await _visualize_pad_button(lp, pad_x, pad_y)
+                tasks.append(_visualize_pad_button(lp, pad_x, pad_y, level_side=level_side))
 
-        elif new_level < old_level:
-            # down
-            for y in range(new_level + 1, old_level + 1):
-                pad_y = CONFIG.pads.PADS_IN_COLUMN - y + 1
-                await _visualize_pad_button(lp, pad_x, pad_y, level_side=-1)
+            BANDS_POS[pad_x] = new_level
 
-        # update the curr value
-        BANDS_POS[pad_x] = new_level
+    if tasks:
+        await asyncio.gather(*tasks)
 
-    # visualize side buttons
     await _visualize_side_buttons(lp, bands_arr[0], bands_arr[1])
+
 
 async def _visualize_pad_button(
         lp: launchpad.LaunchpadPro,

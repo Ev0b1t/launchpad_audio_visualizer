@@ -1,17 +1,18 @@
-import sys
+import cProfile
+import pstats
 import asyncio
 import numpy as np
 import launchpad_py as launchpad
-from pydub import AudioSegment
 import sounddevice as sd
 from core.config import CONFIG
 from core.state import EMA_GLOBAL_PEAK
 from core.laucnhpad_visualization import visualize_audio_bands
 from utils.general import find_opened_port
 from utils.logger import logger
+from core.capture_audio import capture_audio, handle_chunk, CHANNELS, SAMPLERATE, CHUNK_SIZE
 
 
-
+Q = asyncio.Queue()
 
 def process_audio_chunk(
     chunk, samplerate, channels, chunk_size, window,
@@ -44,7 +45,7 @@ def process_audio_chunk(
 
     return bands_rms
 
-def normalize_bands(bands_rms):
+def normalize_bands(bands_rms: np.ndarray):
     """
     Bands normalazing
     """
@@ -78,79 +79,32 @@ def normalize_bands(bands_rms):
 
 
 
-async def play_and_visualize(lp, audio, chunk_size: int = 1024):
-    """
-    Main function to play an audio file and visualize it in real-time.
-    """
+async def play_and_visualize(lp, chunk_size: int = 1024):
+    counter = 0
 
-    # SoundDevice callback for audio playback
-    def audio_callback(outdata, frames, time, status):
-        nonlocal pos
-        if status:
-            logger.debug(f"Audio callback status: {status}")
+    async for audio_b in capture_audio(chunk_size):
+        chunk = handle_chunk(audio_b)
+        if len(chunk) < chunk_size * CHANNELS:
+            continue
 
-        end = pos + frames * channels
-        if end > len(samples):
-            # End of audio stream
-            out_chunk = np.zeros((frames, channels), dtype=np.float32)
-            available = (len(samples) - pos) // channels
-            if available > 0:
-                out_chunk[:available] = samples[pos:pos+available*channels].reshape(-1, channels)
-            outdata[:] = out_chunk
-            raise sd.CallbackStop()
-        else:
-            # Normal audio chunk playback
-            out_chunk = samples[pos:end].reshape(-1, channels)
-            outdata[:] = out_chunk
-        pos = end
-
-
-    samplerate = audio.frame_rate
-    channels = audio.channels
-    pos = 0
-
-    # Convert audio to a float32 numpy array and normalize to [-1, 1]
-    samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
-    samples /= np.iinfo(audio.array_type).max
-
-    # Windowing function to reduce spectral leakage
-    window = np.hanning(chunk_size)
-
-    stream = sd.OutputStream(
-        samplerate=samplerate,
-        channels=channels,
-        callback=audio_callback,
-        blocksize=chunk_size
-    )
-
-    with stream:
-        while pos < len(samples):
-            # Extract and process audio chunk
-            chunk = samples[pos:pos + chunk_size * channels]
-            if 0 < len(chunk) < chunk_size * channels:
-                break
-
+        if counter % 2 == 0:
+            window = np.hanning(chunk_size)
             bands_rms = process_audio_chunk(
-                chunk, samplerate, channels, chunk_size, window,
+                chunk, SAMPLERATE, CHANNELS, chunk_size, window,
                 CONFIG.bands.RANGE
             )
-
-            # Normalize and send to Launchpad
             normalized_bands = normalize_bands(bands_rms)
             await visualize_audio_bands(lp, normalized_bands)
+            counter = 0
+        counter += 1
 
-            # Wait for the chunk to finish playing
-            await asyncio.sleep(chunk_size / samplerate)
 
 def main():
     """
     Main function to run the audio visualizer.
     """
-    if len(sys.argv) < 2:
-        logger.debug(r"Usage: python your_script_name.py \<path_to_audio_file.mp3>")
-        sys.exit(1)
+    global CHUNK_SIZE
 
-    AUDIO_FPATH = sys.argv[1]
     lp = launchpad.LaunchpadPro()
     launchpad_port_index = find_opened_port(lp)
 
@@ -161,22 +115,18 @@ def main():
     # Reset lights
     lp.Reset()
 
-    # Load audio
+    pr = cProfile.Profile()
     try:
-        audio = AudioSegment.from_mp3(AUDIO_FPATH)
-    except FileNotFoundError:
-        logger.error(f"Error: The file at {AUDIO_FPATH} was not found.")
-        return
-    except Exception as e:
-        logger.exception(f"Error loading audio file: {e}")
-        return
-
-    try:
-        asyncio.run(play_and_visualize(lp, audio))
+        pr.enable()
+        asyncio.run(play_and_visualize(lp, CHUNK_SIZE))
     except KeyboardInterrupt:
         logger.debug("Visualization stopped by user.")
     finally:
+        pr.disable()
+        stats = pstats.Stats(pr)
+        stats.sort_stats("tottime").print_stats(20)
         lp.Reset()
+
 
 
 if __name__ == "__main__":
