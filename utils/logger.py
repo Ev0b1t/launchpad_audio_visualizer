@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from loguru import logger
 
-LOGS_DIR = os.path.join('..', 'logs')
+LOGS_DIR = os.path.join('logs')
 
 os.makedirs(LOGS_DIR, exist_ok=True)
 LOG_NAME = f"{datetime.now().date()}.log"

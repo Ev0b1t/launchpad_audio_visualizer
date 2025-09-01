@@ -5,10 +5,47 @@ from functools import cached_property
 # CONFIG DATACLASSES
 # =====================
 
+# dataclass for capture audio channels, monitors etc
+@dataclass(frozen=True)
+class AudioConfig:
+    MONITOR_SRC: str = 'alsa_output.pci-0000_00_1f.3.analog-stereo.monitor'
+    FORMAT_AUDIO_CARD: str = "pulse"
+    CODEC: str = "pcm_f32le"
+    RAW_FORMAT: str = "f32le"
+    CHANNELS: int = 2
+    SAMPLERATE: int = 44100
+    OUTPUT: str = "pipe:1"
+    CHUNK_SIZE: int = 1024 * 1
+    FLUSH_PACKETS: int = 0
+    BLOCK_SIZE: int = 65536
+
+    SAMPLE_WIDTH: int = 4 # pcm 32 -> 4 bytes
+
 @dataclass(frozen=True)
 class PadsConfig:
-    # Pads layout
+    # layout
     PADS_IN_COLUMN: int = 8
+    PADS_IN_ROW: int = 7
+
+    # start positions
+    LEFT_X_POS: int = 9
+    RIGHT_X_POS: int = 8
+    TOP_Y_POS: int = 0
+    BOTTOM_Y_POS: int = 9
+
+    # RGB low, mid, high has different colors
+    LOW_START_Y_POS = 6
+    LOW_END_Y_POS = 8
+    MID_START_Y_POS = 3
+    MID_END_Y_POS = 5
+    HIGH_START_Y_POS = 1
+    HIGH_END_Y_POS = 2
+
+    # Range of side buttons (left, top, right, bottom)
+    TOP_X_RANGE = (0, 8)
+    BOTTOM_X_RANGE = (0, 8)
+    LEFT_Y_RANGE = (1, 9)
+    RIGHT_Y_RANGE = (1, 9)
 
 @dataclass(frozen=True)
 class ColorConfig:
@@ -16,9 +53,23 @@ class ColorConfig:
     MAX_VAL: int = 63  # max value
     MIN_VAL: int = 0   # min value
 
+    # Central pads color (the bands)
     RGB_LOW = (MIN_VAL, MIN_VAL, MAX_VAL)
     RGB_MID = (MAX_VAL, MAX_VAL, MAX_VAL)
     RGB_HIGH = (MAX_VAL, MIN_VAL, MIN_VAL)
+
+    # Side buttons color
+    RIGHT_START_RGB = (0, 63, 63)
+    LEFT_START_RGB = (0, 0, 63)
+    TOP_RGB = (0, 63, 0)
+    BOTTOM_RGB = (63, 20, 0)
+
+    # end
+    RIGHT_END_RGB = (63, 63, 0)
+    LEFT_END_RGB = (63, 0, 0)
+    # top and bottom has dynamic end colors
+
+    OFF_COLOR_RGB = (0, 0, 0)
 
 @dataclass(frozen=True)
 class EmaConfig:
@@ -52,7 +103,16 @@ class BandsConfig:
 @dataclass(frozen=True)
 class ThresholdConfig:
     # Threshold to trigger LED updates
-    VAL: float = 0.9
+    GENERAL: float = 0.9
+    LEFT_SUB: float = 0.3
+    RIGHT_BASS: float = 0.5
+    TOP_BASS: float = 0.9
+    TOP_SUB: float = 0.9
+    BOTTOM_HIGH: float = 0.7
+    BOTTOM_MID_HIGH: float = 0.7
+    LOW_MID_HIGH: float = 0.7
+    ACCENT_BOOST: float = 0.7
+
 
 
 # =====================
@@ -80,6 +140,10 @@ class Config:
     @cached_property
     def threshold(self) -> ThresholdConfig:
         return ThresholdConfig()
+
+    @cached_property
+    def audio(self) -> AudioConfig:
+        return AudioConfig()
 
 
 # =====================

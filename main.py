@@ -1,18 +1,16 @@
 import cProfile
 import pstats
 import asyncio
+import argparse
 import numpy as np
 import launchpad_py as launchpad
-import sounddevice as sd
+from asyncstdlib import enumerate as aenumerate
 from core.config import CONFIG
 from core.state import EMA_GLOBAL_PEAK
 from core.laucnhpad_visualization import visualize_audio_bands
 from utils.general import find_opened_port
 from utils.logger import logger
-from core.capture_audio import capture_audio, handle_chunk, CHANNELS, SAMPLERATE, CHUNK_SIZE
-
-
-Q = asyncio.Queue()
+from core.capture_audio import capture_audio, handle_chunk
 
 def process_audio_chunk(
     chunk, samplerate, channels, chunk_size, window,
@@ -64,12 +62,12 @@ def normalize_bands(bands_rms: np.ndarray):
         for i, rms_val in enumerate(bands_rms):
             # check by threshold
             # if the RMS value less than threshold change it to 0.0
-            if rms_val < CONFIG.threshold.VAL:
+            if rms_val < CONFIG.threshold.GENERAL:
                 final_brightness = 0.0
             else:
                 base_brightness = rms_val / EMA_GLOBAL_PEAK
                 accent_boost = (rms_val / (CONFIG.bands.EMAS[i] + CONFIG.ema.MIN_PEAK))
-                final_brightness = max(base_brightness, accent_boost * 0.7)
+                final_brightness = max(base_brightness, accent_boost * CONFIG.threshold.ACCENT_BOOST)
 
             normalized_bands.append(min(1.0, final_brightness))
     else:
@@ -77,56 +75,68 @@ def normalize_bands(bands_rms: np.ndarray):
 
     return normalized_bands
 
+async def play_and_visualize(lp, chunk_size: int = 1024, hanning_window: np.ndarray = np.hanning(1024)):
+    global CONFIG
 
-
-async def play_and_visualize(lp, chunk_size: int = 1024):
-    counter = 0
-
-    async for audio_b in capture_audio(chunk_size):
+    async for i, audio_b in aenumerate(capture_audio(chunk_size)):
         chunk = handle_chunk(audio_b)
-        if len(chunk) < chunk_size * CHANNELS:
-            continue
-
-        if counter % 2 == 0:
-            window = np.hanning(chunk_size)
-            bands_rms = process_audio_chunk(
-                chunk, SAMPLERATE, CHANNELS, chunk_size, window,
-                CONFIG.bands.RANGE
-            )
-            normalized_bands = normalize_bands(bands_rms)
-            await visualize_audio_bands(lp, normalized_bands)
-            counter = 0
-        counter += 1
-
+        if not(len(chunk) < chunk_size * CONFIG.audio.CHANNELS):
+            if i % 2 == 0:
+                bands_rms = process_audio_chunk(
+                    chunk, CONFIG.audio.SAMPLERATE, CONFIG.audio.CHANNELS, chunk_size, hanning_window,
+                    CONFIG.bands.RANGE
+                )
+                normalized_bands = normalize_bands(bands_rms)
+                await visualize_audio_bands(lp, normalized_bands)
 
 def main():
     """
     Main function to run the audio visualizer.
     """
-    global CHUNK_SIZE
+    global CONFIG
+
+    parser = argparse.ArgumentParser(description="Audio visualizer launchpad")
+    parser.add_argument("-p", "--profiling", action="store_true", help="Enable profiling")
+    args = parser.parse_args()
 
     lp = launchpad.LaunchpadPro()
+    logger.info("Launchpad Pro opened.")
+    logger.debug("Finding opened port...")
     launchpad_port_index = find_opened_port(lp)
+    logger.debug(f"Result port index: {launchpad_port_index}")
 
     if launchpad_port_index == -1:
-        logger.debug("The launchpad port was not found.")
+        logger.warning("The launchpad port was not found.")
         return
 
     # Reset lights
+    logger.info("Resetting lights...")
     lp.Reset()
 
-    pr = cProfile.Profile()
+    if args.profiling:
+        pr = cProfile.Profile()
     try:
-        pr.enable()
-        asyncio.run(play_and_visualize(lp, CHUNK_SIZE))
+        if args.profiling:
+            logger.info("Profiling enabled.")
+            pr.enable()
+        logger.info("Starting visualization...")
+        asyncio.run(play_and_visualize(lp, CONFIG.audio.CHUNK_SIZE))
     except KeyboardInterrupt:
-        logger.debug("Visualization stopped by user.")
+        logger.warning("Visualization stopped by user.")
+    except Exception as e:
+        logger.exception("Visualization stopped by exception.")
     finally:
-        pr.disable()
-        stats = pstats.Stats(pr)
-        stats.sort_stats("tottime").print_stats(20)
-        lp.Reset()
-
+        if args.profiling:
+            logger.info("Profiling disabled.")
+            pr.disable()
+            stats = pstats.Stats(pr)
+            stats.sort_stats("tottime").print_stats(20)
+        try:
+            logger.info("Resetting lights...")
+            lp.Reset()
+        except Exception as e:
+            logger.exception("Launchpad reset failed.")
+    logger.info("Visualization stopped.")
 
 
 if __name__ == "__main__":
