@@ -11,6 +11,7 @@ from core.laucnhpad_visualization import visualize_audio_bands
 from utils.general import find_opened_port
 from utils.logger import logger
 from core.capture_audio import capture_audio, handle_chunk
+from core.state import reset_state, STATE_RESETTED
 
 def process_audio_chunk(
     chunk, samplerate, channels, chunk_size, window,
@@ -73,10 +74,16 @@ def normalize_bands(bands_rms: np.ndarray):
     else:
         normalized_bands = [0.0] * len(bands_rms)
 
+    # wave effect
+    for i in range(len(normalized_bands)):
+        left = normalized_bands[i-1] if i > 0 else normalized_bands[i]
+        right = normalized_bands[i+1] if i < len(normalized_bands)-1 else normalized_bands[i]
+        normalized_bands[i] = 0.25 * left + 0.5 * normalized_bands[i] + 0.25 * right
+
     return normalized_bands
 
 async def play_and_visualize(lp, chunk_size: int = 1024, hanning_window: np.ndarray = np.hanning(1024)):
-    global CONFIG
+    global CONFIG, STATE_RESETTED
 
     async for i, audio_b in aenumerate(capture_audio(chunk_size)):
         chunk = handle_chunk(audio_b)
@@ -86,8 +93,18 @@ async def play_and_visualize(lp, chunk_size: int = 1024, hanning_window: np.ndar
                     chunk, CONFIG.audio.SAMPLERATE, CONFIG.audio.CHANNELS, chunk_size, hanning_window,
                     CONFIG.bands.RANGE
                 )
-                normalized_bands = normalize_bands(bands_rms)
-                await visualize_audio_bands(lp, normalized_bands)
+                if np.any(bands_rms):
+                    normalized_bands = normalize_bands(bands_rms)
+                    await visualize_audio_bands(lp, normalized_bands)
+                    STATE_RESETTED = False
+                else:
+                    # if the bands rms is empty, reset the state
+                    if not STATE_RESETTED:
+                        reset_state()
+                        await visualize_audio_bands(lp, [0.0] * len(CONFIG.bands.RANGE))
+                    else:
+                        # wait for the new input signal
+                        await asyncio.sleep(0.01)
 
 def main():
     """

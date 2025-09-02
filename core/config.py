@@ -103,7 +103,7 @@ class BandsConfig:
 @dataclass(frozen=True)
 class ThresholdConfig:
     # Threshold to trigger LED updates
-    GENERAL: float = 0.9
+    GENERAL: float = 0.01
     LEFT_SUB: float = 0.3
     RIGHT_BASS: float = 0.5
     TOP_BASS: float = 0.9
@@ -111,7 +111,7 @@ class ThresholdConfig:
     BOTTOM_HIGH: float = 0.7
     BOTTOM_MID_HIGH: float = 0.7
     LOW_MID_HIGH: float = 0.7
-    ACCENT_BOOST: float = 0.7
+    ACCENT_BOOST: float = 0.99
 
 
 
