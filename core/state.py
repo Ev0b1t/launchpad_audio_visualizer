@@ -1,9 +1,9 @@
 # Global variables which will be using at the runtime moment
 from datetime import datetime, timedelta
+from core.config import CONFIG
 from utils.logger import logger
 
 BANDS_POS = []
-EMA_GLOBAL_PEAK = 1.0
 
 # Smoothing coefficients
 ALPHA_SUB = 0.8
@@ -31,24 +31,32 @@ VSSCACHE_TOP_INDEX = 16
 VSSCACHE_BOTTOM_INDEX = 24
 
 STATE_RESETTED = True
-STATE_RESETTED_DATETIME = datetime.now()
-STATE_RESETTED_COUNTDOWN = timedelta(seconds=4)
+STATE_RESETTED_COUNTDOWN = timedelta(seconds=2)
+STATE_RESETTED_DATETIME = datetime.now() + STATE_RESETTED_COUNTDOWN
 
 def reset_state():
-    global BANDS_POS, EMA_GLOBAL_PEAK, VSTATE, VISUAL_SIDE_STATE_CACHE, STATE_RESETTED, STATE_RESETTED_DATETIME
+    global BANDS_POS, VISUAL_SIDE_STATE_CACHE, STATE_RESETTED, STATE_RESETTED_DATETIME, VSTATE
 
     if STATE_RESETTED:
+        logger.debug("State is already resetted.")
         return False
 
-    if STATE_RESETTED_DATETIME > datetime.now() - STATE_RESETTED_COUNTDOWN:
+    if STATE_RESETTED_DATETIME > datetime.now():
         logger.debug("State not resetted because it was resetted less than %s seconds ago", STATE_RESETTED_COUNTDOWN.total_seconds())
         return False
 
-    logger.debug("Resetting state...")
-    BANDS_POS.clear()
-    EMA_GLOBAL_PEAK = 1.0
+    logger.info("Resetting state...")
+    BANDS_POS = []
     VSTATE = VisualizerState()
     VISUAL_SIDE_STATE_CACHE = [(0, 0, 0) for _ in VISUAL_SIDE_STATE_CACHE]
+
     STATE_RESETTED = True
-    STATE_RESETTED_DATETIME = datetime.now()
+    STATE_RESETTED_DATETIME = datetime.now() + STATE_RESETTED_COUNTDOWN
+
+    # TODO: change from config to constants
+    logger.debug("Resetting state...")
+    CONFIG.bands.FAST = [0.0] * len(CONFIG.bands.FAST)
+    CONFIG.bands.SLOW = [0.0] * len(CONFIG.bands.SLOW)
+
+    logger.info("State resetted.")
     return True

@@ -54,28 +54,30 @@ class ColorConfig:
     MIN_VAL: int = 0   # min value
 
     # Central pads color (the bands)
-    RGB_LOW = (MIN_VAL, MIN_VAL, MAX_VAL)
-    RGB_MID = (MAX_VAL, MAX_VAL, MAX_VAL)
-    RGB_HIGH = (MAX_VAL, MIN_VAL, MIN_VAL)
+    RGB_LOW = (MIN_VAL, MAX_VAL, MAX_VAL // 2)
+    RGB_MID = (MIN_VAL, MAX_VAL, MAX_VAL // 2)
+    RGB_HIGH = (MIN_VAL, MAX_VAL, MAX_VAL // 2)
 
     # Side buttons color
-    RIGHT_START_RGB = (0, 63, 63)
-    LEFT_START_RGB = (0, 0, 63)
-    TOP_RGB = (0, 63, 0)
-    BOTTOM_RGB = (63, 20, 0)
+    TOP_RGB = (MIN_VAL, MIN_VAL, MAX_VAL)
+    BOTTOM_RGB = (MAX_VAL // 2, MAX_VAL // 2, MAX_VAL // 2)
 
-    # end
-    RIGHT_END_RGB = (63, 63, 0)
-    LEFT_END_RGB = (63, 0, 0)
+    # start and end colors (gradient)
+    RIGHT_START_RGB = (MAX_VAL, MIN_VAL, MIN_VAL)
+    RIGHT_END_RGB = (MIN_VAL, MIN_VAL, MAX_VAL)
+
+    LEFT_START_RGB = (MIN_VAL, MIN_VAL, MAX_VAL)
+    LEFT_END_RGB = (MAX_VAL, MIN_VAL, MIN_VAL)
+
     # top and bottom has dynamic end colors
 
-    OFF_COLOR_RGB = (0, 0, 0)
+    OFF_COLOR_RGB = (MIN_VAL, MIN_VAL, MIN_VAL)
 
 @dataclass(frozen=True)
 class EmaConfig:
     # EMA for monitoring peaks
-    SMOOTHING: float = 0.1
-    MIN_PEAK: float = 0.01
+    FAST_SMOOTHING: float = 0.8
+    SLOW_SMOOTHING: float = 0.05
 
 @dataclass(frozen=True)
 class BandsConfig:
@@ -83,7 +85,10 @@ class BandsConfig:
     MAX_FQ: int = 22050
     MIN_FQ: int = 0
     RANGE: list[tuple[int, int]] = field(init=False)
-    EMAS: list[float] = field(init=False)
+
+    # TODO: change from config to constants
+    FAST: list[float] = field(init=False)   # fast EMA values
+    SLOW: list[float] = field(init=False)   # slow EMA values
 
     def __post_init__(self):
         object.__setattr__(self, 'RANGE', [
@@ -97,13 +102,12 @@ class BandsConfig:
                 (6400, 22050)
             ]
         )
-        object.__setattr__(self, 'EMAS', [0.0] * len(self.RANGE))
-
+        object.__setattr__(self, 'FAST', [0.0] * len(self.RANGE))
+        object.__setattr__(self, 'SLOW', [0.0] * len(self.RANGE))
 
 @dataclass(frozen=True)
 class ThresholdConfig:
     # Threshold to trigger LED updates
-    GENERAL: float = 0.01
     LEFT_SUB: float = 0.3
     RIGHT_BASS: float = 0.5
     TOP_BASS: float = 0.9
@@ -111,7 +115,6 @@ class ThresholdConfig:
     BOTTOM_HIGH: float = 0.7
     BOTTOM_MID_HIGH: float = 0.7
     LOW_MID_HIGH: float = 0.7
-    ACCENT_BOOST: float = 0.99
 
 
 

@@ -6,7 +6,6 @@ import numpy as np
 import launchpad_py as launchpad
 from asyncstdlib import enumerate as aenumerate
 from core.config import CONFIG
-from core.state import EMA_GLOBAL_PEAK
 from core.laucnhpad_visualization import visualize_audio_bands
 from utils.general import find_opened_port
 from utils.logger import logger
@@ -50,35 +49,45 @@ def normalize_bands(bands_rms: np.ndarray):
     """
     global EMA_GLOBAL_PEAK
 
+    fast_ema_smoothing = CONFIG.ema.FAST_SMOOTHING
+    slow_ema_smoothing = CONFIG.ema.SLOW_SMOOTHING
+
     # Updating the global and the individual EMA
     for i, rms_val in enumerate(bands_rms):
-        CONFIG.bands.EMAS[i] = (CONFIG.ema.SMOOTHING * rms_val) + ((1 - CONFIG.ema.SMOOTHING) * CONFIG.bands.EMAS[i])
-
-    max_rms = max(bands_rms) if bands_rms else 0.0
-    EMA_GLOBAL_PEAK = (CONFIG.ema.SMOOTHING * max_rms) + ((1 - CONFIG.ema.SMOOTHING) * EMA_GLOBAL_PEAK)
+        # add fast and slow EMA
+        CONFIG.bands.FAST[i] = (fast_ema_smoothing * rms_val) + ((1 - fast_ema_smoothing) * CONFIG.bands.FAST[i])
+        CONFIG.bands.SLOW[i] = (slow_ema_smoothing * rms_val) + ((1 - slow_ema_smoothing) * CONFIG.bands.SLOW[i])
 
     normalized_bands = []
-    if EMA_GLOBAL_PEAK > CONFIG.ema.MIN_PEAK:
-        # Normalization with adaptive accent
-        for i, rms_val in enumerate(bands_rms):
-            # check by threshold
-            # if the RMS value less than threshold change it to 0.0
-            if rms_val < CONFIG.threshold.GENERAL:
-                final_brightness = 0.0
-            else:
-                base_brightness = rms_val / EMA_GLOBAL_PEAK
-                accent_boost = (rms_val / (CONFIG.bands.EMAS[i] + CONFIG.ema.MIN_PEAK))
-                final_brightness = max(base_brightness, accent_boost * CONFIG.threshold.ACCENT_BOOST)
 
-            normalized_bands.append(min(1.0, final_brightness))
-    else:
-        normalized_bands = [0.0] * len(bands_rms)
+    for i in range(len(bands_rms)):
+        fast = CONFIG.bands.FAST[i]
+        slow = CONFIG.bands.SLOW[i]
+
+        # Protection from division by zero
+        if slow < 1e-6:
+            ratio = 0.0
+        else:
+            ratio = fast / slow
+
+        # Limit the range to 0..1
+        brightness = np.tanh(ratio)
+
+        normalized_bands.append(brightness)
 
     # wave effect
     for i in range(len(normalized_bands)):
         left = normalized_bands[i-1] if i > 0 else normalized_bands[i]
         right = normalized_bands[i+1] if i < len(normalized_bands)-1 else normalized_bands[i]
-        normalized_bands[i] = 0.25 * left + 0.5 * normalized_bands[i] + 0.25 * right
+        center = normalized_bands[i]
+        diff_left = abs(center - left)
+        diff_right = abs(center - right)
+
+        weight_left = 0.25 * (1 - diff_left)
+        weight_right = 0.25 * (1 - diff_right)
+        weight_center = 1.0 - weight_left - weight_right
+
+        normalized_bands[i] = weight_left * left + weight_center * center + weight_right * right
 
     return normalized_bands
 
@@ -96,12 +105,18 @@ async def play_and_visualize(lp, chunk_size: int = 1024, hanning_window: np.ndar
                 if np.any(bands_rms):
                     normalized_bands = normalize_bands(bands_rms)
                     await visualize_audio_bands(lp, normalized_bands)
-                    STATE_RESETTED = False
+                    # if the state was resetted, set it to False one time
+                    if STATE_RESETTED is not False:
+                        STATE_RESETTED = False
                 else:
                     # if the bands rms is empty, reset the state
                     if not STATE_RESETTED:
+                        logger.info("Resetting state...")
                         reset_state()
                         await visualize_audio_bands(lp, [0.0] * len(CONFIG.bands.RANGE))
+                        lp.Reset()
+                        logger.info("State resetted.")
+                        STATE_RESETTED = True
                     else:
                         # wait for the new input signal
                         await asyncio.sleep(0.01)

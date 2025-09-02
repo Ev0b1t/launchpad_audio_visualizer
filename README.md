@@ -1,3 +1,5 @@
+<!-- TODO: update readme (the prev version is about global EMA etc) -->
+
 # 🎵 Launchpad Audio Visualizer
 
 A real-time audio visualization system that transforms your music into stunning light shows on a Novation Launchpad Pro. Watch as bass drops, snares, and melodies come alive through dynamic RGB patterns synchronized to your audio.
