@@ -1,5 +1,4 @@
 <!-- TODO: update readme (the prev version is about global EMA etc) -->
-
 # 🎵 Launchpad Audio Visualizer
 
 A real-time audio visualization system that transforms your music into stunning light shows on a Novation Launchpad Pro. Watch as bass drops, snares, and melodies come alive through dynamic RGB patterns synchronized to your audio.
@@ -10,48 +9,70 @@ A real-time audio visualization system that transforms your music into stunning 
 ![Windows Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
 
 <!-- JPG Demo visualization -->
-![Demo](readme_assets/demo_1.jpg)
-![Demo](readme_assets/demo_2.jpg)
+![Demo](readme_assets/demo1.jpeg)
+![Demo](readme_assets/demo2.jpeg)
 
 ## ✨ Features
 
 - **🎨 Real-time Audio Visualization**: Live frequency analysis with smooth LED transitions
+- **🧠 Psychoacoustic Weighting**: Natural sound perception modeling for more realistic visualization
 - **🎛️ Multi-Zone Mapping**: Different frequency ranges mapped to distinct pad zones
-- **🔊 Side Button Integration**: Bass, sub-bass, and high-frequency responsive side buttons
-- **⚡ High Performance**: Optimized async processing with intelligent caching
+- **🔊 Enhanced Side Button System**: Individual control for top, bottom, left, and right side buttons with split-zone functionality
+- **⚡ High Performance**: Optimized async processing with intelligent caching and dual EMA smoothing
 - **🎯 Smart Caching**: Prevents unnecessary LED updates for better performance
-- **📊 Frequency Band Analysis**: 8-band frequency spectrum analysis (0Hz - 22kHz)
+- **📊 Advanced Frequency Analysis**: 8-band spectrum analysis with psychoacoustic weighting (0Hz - 22kHz)
 - **🎵 Universal Audio Input**: Works with any audio source - YouTube, Spotify, MP3 players, games, system audio
 - **🔌 Audio Source Flexibility**: Compatible with PulseAudio monitor sources and Windows Stereo Mix
-- **⚙️ Advanced Signal Processing**: Configurable threshold and EMA settings for precise audio visualization control
+- **⚙️ Precision Signal Processing**: Configurable thresholds, EMA settings, and side button controls
 
 ## 🎯 Key Configuration Features
 
-### **THRESHOLD_GENERAL - Signal Sensitivity Control**
-The `THRESHOLD_GENERAL` value (default: 0.9) in `core/config.py` is the **primary sensitivity controller** for the entire Launchpad visualization:
+### **🧠 Psychoacoustic Weighting - Natural Sound Perception**
+The **key improvement** of this system is the psychoacoustic weighting algorithm that models human hearing perception:
 
-- **Low values (0.1-0.4)**: Launchpad reacts to **all audio signals**, including background noise and quiet sounds
-- **High values (0.7-0.9)**: Launchpad only reacts to **important signals and hits**, making the visualization focus on prominent beats, drops, and musical accents
-- **Perfect for tuning**: Adjust this value to match your music style and desired visual intensity
+```python
+PSYCHOACOUSTIC_WEIGHTS = [
+    0.1,   # 0-100 Hz (Sub-bass - less perceptible)
+    0.2,   # 100-200 Hz (Bass)
+    0.4,   # 200-400 Hz (Low-mid)
+    0.8,   # 400-800 Hz (Mid - more perceptible)
+    1.5,   # 800-1600 Hz (Upper-mid - most perceptible)
+    2.0,   # 1600-3200 Hz (Presence - peak sensitivity)
+    1.8,   # 3200-6400 Hz (Brilliance)
+    1.2    # 6400-22050 Hz (Air - reduced sensitivity)
+]
+```
 
-### **EmaConfig - Signal Smoothing**
-The `EmaConfig` controls how input signals are processed:
+- **Natural visualization**: Frequencies are weighted based on human hearing sensitivity
+- **More realistic response**: Mid-range frequencies (800Hz-3.2kHz) get higher weights as they're most perceptible to human ears
+- **Balanced output**: Prevents bass-heavy or treble-heavy music from dominating the visualization
 
-- **SMOOTHING (0.1)**: Determines signal handling behavior
-  - **Lower values**: **Hard/Sharp** response - immediate LED changes, more aggressive visualization
-  - **Higher values**: **Soft/Smooth** response - gradual LED transitions, smoother visualization flow
-- **MIN_PEAK (0.01)**: Minimum peak detection threshold for signal processing
+### **⚙️ Dual EMA System - Advanced Signal Processing**
+The `EmaConfig` uses a sophisticated dual-smoothing approach:
 
-### **ThresholdConfig - Side Button Precision**
-Each side button group has individual threshold settings for the 8 frequency bands:
+- **FAST_SMOOTHING (0.8)**: Quick response for detecting musical hits and transients
+- **SLOW_SMOOTHING (0.05)**: Long-term average for normalization and baseline
+- **Adaptive normalization**: Uses fast/slow ratio with tanh function for natural brightness curves
+- **Noise filtering**: Hard threshold (0.08) eliminates background noise
 
-- **LEFT_SUB (0.3)**: Left side buttons react to sub-bass frequencies (0-100Hz)
-- **RIGHT_BASS (0.5)**: Right side buttons react to bass frequencies (100-200Hz)
-- **TOP_BASS (0.9)**: Top buttons trigger when bass+sub-bass combined signal exceeds threshold
-- **BOTTOM_HIGH (0.7)**: Bottom buttons react when high frequencies (3.2kHz+) are detected
-- **BOTTOM_MID_HIGH (0.7)**: Bottom buttons also respond to mid-high frequencies (1.6-3.2kHz)
+### **🎛️ Enhanced Side Button System**
+Individual control for each side button group with advanced features:
 
-The system calculates the **sum of relevant frequency bands divided by their count** to determine if the threshold is exceeded, ensuring accurate musical accent detection.
+**Button Control Toggles:**
+- `TURN_ON_TOP_BUTTONS`: Enable/disable top side buttons
+- `TURN_ON_BOTTOM_BUTTONS`: Enable/disable bottom side buttons
+- `TURN_ON_LEFT_BUTTONS`: Enable/disable left side buttons
+- `TURN_ON_RIGHT_BUTTONS`: Enable/disable right side buttons
+
+**Split-Zone Functionality:**
+- **Top buttons**: Split into left (800-1600Hz) and right (3200-6400Hz) halves
+- **Bottom buttons**: Split into mid (3200-6400Hz) and high (6400-22kHz) halves
+- **SIDE_HALF_THRESHOLD [0.2, 0.3, 0.6, 0.7]**: Individual thresholds for each button in split zones
+
+**Frequency Mapping:**
+- **LEFT_SUB (0.3)**: Sub-bass frequencies (0-100Hz) with gradient colors
+- **RIGHT_BASS (0.5)**: Bass frequencies (100-200Hz) with gradient colors
+- **Split-zone processing**: Each half responds to different frequency ranges for more detailed visualization
 
 ## 🎮 Visualization Zones
 
@@ -61,10 +82,10 @@ The system calculates the **sum of relevant frequency bands divided by their cou
 - **🔵 Low Frequencies (6-8)**: Blue LEDs for bass and kick drums
 
 ### Side Buttons
-- **🔵-🔴Left Side**: Sub-bass responsive (cyan to red gradient)
-- **🟢-🟡Right Side**: Bass responsive (cyan to yellow gradient)
-- **🟢Top Buttons**: Combined bass+sub trigger (green)
-- **🟠Bottom Buttons**: High+mid-high trigger (orange)
+- **Left Side**: Sub-bass responsive (0-100Hz) with blue-to-red gradient
+- **Right Side**: Bass responsive (100-200Hz) with red-to-blue gradient
+- **Top Buttons**: Split-zone - Left half (800-1600Hz) green-blue tones, Right half (3200-6400Hz) purple-pink tones
+- **Bottom Buttons**: Split-zone - Left half (3200-6400Hz) orange tones, Right half (6400-22kHz) blue tones
 
 ## 🚀 Quick Start
 
@@ -185,19 +206,20 @@ class AudioConfig:
 ```python
 @dataclass(frozen=True)
 class ColorConfig:
-    # Main pad colors
-    RGB_LOW = (0, 0, 63)    # Blue for bass
-    RGB_MID = (63, 63, 63)  # White for mids
-    RGB_HIGH = (63, 0, 0)   # Red for highs
+    # Main pad colors (unified cyan-teal theme)
+    RGB_LOW = (0, 63, 31)   # Cyan-teal for bass
+    RGB_MID = (0, 63, 31)   # Cyan-teal for mids
+    RGB_HIGH = (0, 63, 31)  # Cyan-teal for highs
 
     # Side button gradients
-    LEFT_START_RGB = (0, 0, 63)
-    LEFT_END_RGB = (63, 0, 0)
-    RIGHT_START_RGB = (0, 0, 63)
-    RIGHT_END_RGB = (63, 0, 0)
-    TOP_RGB = (0, 0, 63)
-    BOTTOM_RGB = (0, 0, 63)
+    LEFT_START_RGB = (0, 0, 63)    # Blue start
+    LEFT_END_RGB = (63, 0, 0)      # Red end
+    RIGHT_START_RGB = (63, 0, 0)   # Red start
+    RIGHT_END_RGB = (0, 0, 63)     # Blue end
 
+    # Dynamic colors for split-zone buttons
+    TOP_RGB = (0, 0, 63)           # Blue base
+    BOTTOM_RGB = (31, 31, 31)      # Gray base
 ```
 
 ### Sensitivity Tuning
@@ -205,10 +227,15 @@ class ColorConfig:
 ```python
 @dataclass(frozen=True)
 class ThresholdConfig:
-    LEFT_SUB: float = 0.3      # Sub-bass sensitivity
-    RIGHT_BASS: float = 0.5    # Bass sensitivity
-    TOP_BASS: float = 0.9      # Top button trigger
-    BOTTOM_HIGH: float = 0.7   # Bottom button trigger
+    LEFT_SUB: float = 0.3      # Sub-bass sensitivity (0-100Hz)
+    RIGHT_BASS: float = 0.5    # Bass sensitivity (100-200Hz)
+    TOP_BASS: float = 0.9      # Top button trigger (800-1600Hz)
+    TOP_SUB: float = 0.9       # Top button trigger (3200-6400Hz)
+    BOTTOM_HIGH: float = 0.7   # Bottom button trigger (3200-6400Hz)
+    BOTTOM_MID_HIGH: float = 0.7  # Bottom button trigger (6400-22kHz)
+
+    # Split-zone thresholds for individual buttons
+    SIDE_HALF_THRESHOLD: [0.2, 0.3, 0.6, 0.7]  # Individual button thresholds
 ```
 
 ## 🏗️ Project Structure
@@ -219,6 +246,7 @@ launchpad_audio_visualizer/
 │   ├── capture_audio.py      # Audio capture and processing
 │   ├── config.py            # Configuration dataclasses
 │   ├── laucnhpad_visualization.py  # LED control and caching
+│   ├── constants.py         # Psychoacoustic weights and constants
 │   └── state.py             # Global state management
 ├── utils/
 │   ├── general.py           # Utility functions

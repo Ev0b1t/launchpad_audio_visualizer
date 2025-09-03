@@ -11,6 +11,7 @@ from utils.general import find_opened_port
 from utils.logger import logger
 from core.capture_audio import capture_audio, handle_chunk
 from core.state import reset_state, STATE_RESETTED
+from core.constants import PSYCHOACOUSTIC_WEIGHTS
 
 def process_audio_chunk(
     chunk, samplerate, channels, chunk_size, window,
@@ -47,49 +48,36 @@ def normalize_bands(bands_rms: np.ndarray):
     """
     Bands normalazing
     """
-    global EMA_GLOBAL_PEAK
+    global CONFIG, PSYCHOACOUSTIC_WEIGHTS
 
-    fast_ema_smoothing = CONFIG.ema.FAST_SMOOTHING
-    slow_ema_smoothing = CONFIG.ema.SLOW_SMOOTHING
+    fast_ema = CONFIG.ema.FAST_SMOOTHING
+    slow_ema = CONFIG.ema.SLOW_SMOOTHING
 
-    # Updating the global and the individual EMA
-    for i, rms_val in enumerate(bands_rms):
-        # add fast and slow EMA
-        CONFIG.bands.FAST[i] = (fast_ema_smoothing * rms_val) + ((1 - fast_ema_smoothing) * CONFIG.bands.FAST[i])
-        CONFIG.bands.SLOW[i] = (slow_ema_smoothing * rms_val) + ((1 - slow_ema_smoothing) * CONFIG.bands.SLOW[i])
+    # Apply psychoacoustic weights to the input data
+    weighted_rms = bands_rms * np.array(PSYCHOACOUSTIC_WEIGHTS)
 
-    normalized_bands = []
+    # Update EMA with weighted values
+    for i, rms_val in enumerate(weighted_rms):
+        CONFIG.bands.FAST[i] = fast_ema * rms_val + (1 - fast_ema) * CONFIG.bands.FAST[i]
+        CONFIG.bands.SLOW[i] = slow_ema * rms_val + (1 - slow_ema) * CONFIG.bands.SLOW[i]
 
-    for i in range(len(bands_rms)):
-        fast = CONFIG.bands.FAST[i]
-        slow = CONFIG.bands.SLOW[i]
+    # Vectorized normalization
+    fast_arr = np.array(CONFIG.bands.FAST)
+    slow_arr = np.array(CONFIG.bands.SLOW)
 
-        # Protection from division by zero
-        if slow < 1e-6:
-            ratio = 0.0
-        else:
-            ratio = fast / slow
+    # Protection from division by zero + normalization
+    ratio = np.where(slow_arr < 1e-6, 0.0, fast_arr / slow_arr)
+    brightness = np.tanh(ratio)
 
-        # Limit the range to 0..1
-        brightness = np.tanh(ratio)
+    # Hard threshold for noise
+    brightness[brightness < 0.08] = 0.0
 
-        normalized_bands.append(brightness)
+    # Simple smoothing of adjacent bands
+    if len(brightness) > 2:
+        smoothed = brightness
+        smoothed[1:-1] = 0.5 * brightness[1:-1] + 0.25 * (brightness[:-2] + brightness[2:])
 
-    # wave effect
-    for i in range(len(normalized_bands)):
-        left = normalized_bands[i-1] if i > 0 else normalized_bands[i]
-        right = normalized_bands[i+1] if i < len(normalized_bands)-1 else normalized_bands[i]
-        center = normalized_bands[i]
-        diff_left = abs(center - left)
-        diff_right = abs(center - right)
-
-        weight_left = 0.25 * (1 - diff_left)
-        weight_right = 0.25 * (1 - diff_right)
-        weight_center = 1.0 - weight_left - weight_right
-
-        normalized_bands[i] = weight_left * left + weight_center * center + weight_right * right
-
-    return normalized_bands
+    return brightness
 
 async def play_and_visualize(lp, chunk_size: int = 1024, hanning_window: np.ndarray = np.hanning(1024)):
     global CONFIG, STATE_RESETTED

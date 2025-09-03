@@ -6,20 +6,20 @@ from utils.logger import logger
 BANDS_POS = []
 
 # Smoothing coefficients
-ALPHA_SUB = 0.8
-ALPHA_BASS = 0.8
-ALPHA_HIGH = 0.3
-ALPHA_MID_HIGH = 0.4
-ALPHA_LOW_MID_HIGH = 0.3
+ALPHA_0_100 = 0.8
+ALPHA_100_200 = 0.8
+ALPHA_6400_22000 = 0.3
+ALPHA_800_1600 = 0.4
+ALPHA_800_1600 = 0.3
 
 # state of side buttons
 class VisualizerState:
     def __init__(self):
-        self.smoothed_sub = 0.0
-        self.smoothed_bass = 0.0
-        self.smoothed_high = 0.0
-        self.smoothed_mid_high = 0.0
-        self.smoothed_low_mid_high = 0.0
+        self.smoothed_0_100 = 0.0
+        self.smoothed_100_200 = 0.0
+        self.smoothed_6400_22000 = 0.0
+        self.smoothed_3200_6400 = 0.0
+        self.smoothed_800_1600 = 0.0
 
 
 VSTATE = VisualizerState()

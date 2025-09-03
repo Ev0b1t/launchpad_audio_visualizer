@@ -1,7 +1,7 @@
 import asyncio
 from launchpad_py import launchpad
 from core.config import CONFIG
-from core.state import BANDS_POS, VISUAL_SIDE_STATE_CACHE, VSTATE, ALPHA_SUB, ALPHA_BASS, ALPHA_HIGH, ALPHA_MID_HIGH, ALPHA_LOW_MID_HIGH, VSSCACHE_RIGHT_INDEX, VSSCACHE_TOP_INDEX, VSSCACHE_BOTTOM_INDEX
+from core.state import BANDS_POS, VISUAL_SIDE_STATE_CACHE, VSTATE, ALPHA_0_100, ALPHA_100_200, ALPHA_6400_22000, ALPHA_800_1600, VSSCACHE_RIGHT_INDEX, VSSCACHE_TOP_INDEX, VSSCACHE_BOTTOM_INDEX
 
 
 async def visualize_audio_bands(lp: launchpad.LaunchpadPro, bands_arr):
@@ -39,7 +39,7 @@ async def visualize_audio_bands(lp: launchpad.LaunchpadPro, bands_arr):
 
     await _visualize_side_buttons(
         lp, bands_arr[0], bands_arr[1],
-        bands_arr[-4], bands_arr[-3], bands_arr[-2])
+        bands_arr[-4], bands_arr[-2], bands_arr[-1])
 
 
 async def _visualize_pad_button(
@@ -63,19 +63,19 @@ async def _visualize_pad_button(
 
 
 async def _visualize_side_buttons(
-        lp: launchpad.LaunchpadPro, sub_level: float,
-        bass_level: float, low_mid_high: float, mid_high_level: float, high_level: float):
+        lp: launchpad.LaunchpadPro, lvl_0_100: float,
+        lvl_100_200: float, lvl_800_1600: float, lvl_3200_6400: float, lvl_6400_22000: float):
     """
     Side button visualization with smooth color transitions based on bass level.
     """
-    global VSTATE, ALPHA_SUB, ALPHA_BASS, ALPHA_HIGH, ALPHA_MID_HIGH, VISUAL_SIDE_STATE_CACHE, CONFIG
+    global VSTATE, ALPHA_0_100, ALPHA_100_200, ALPHA_6400_22000, ALPHA_800_1600, VISUAL_SIDE_STATE_CACHE, CONFIG
 
     # 1. UPDATE THE SMOOTHED VALUES using the EMA
-    VSTATE.smoothed_sub = ALPHA_SUB * sub_level + (1 - ALPHA_SUB) * VSTATE.smoothed_sub
-    VSTATE.smoothed_bass = ALPHA_BASS * bass_level + (1 - ALPHA_BASS) * VSTATE.smoothed_bass
-    VSTATE.smoothed_high = ALPHA_HIGH * high_level + (1 - ALPHA_HIGH) * VSTATE.smoothed_high
-    VSTATE.smoothed_mid_high = ALPHA_MID_HIGH * mid_high_level + (1 - ALPHA_MID_HIGH) * VSTATE.smoothed_mid_high
-    VSTATE.smoothed_low_mid_high = ALPHA_MID_HIGH * low_mid_high + (1 - ALPHA_LOW_MID_HIGH) * VSTATE.smoothed_low_mid_high
+    VSTATE.smoothed_0_100 = ALPHA_0_100 * lvl_0_100 + (1 - ALPHA_0_100) * VSTATE.smoothed_0_100
+    VSTATE.smoothed_100_200 = ALPHA_100_200 * lvl_100_200 + (1 - ALPHA_100_200) * VSTATE.smoothed_100_200
+    VSTATE.smoothed_800_1600 = ALPHA_800_1600 * lvl_800_1600 + (1 - ALPHA_800_1600) * VSTATE.smoothed_800_1600
+    VSTATE.smoothed_3200_6400 = ALPHA_800_1600 * lvl_3200_6400 + (1 - ALPHA_800_1600) * VSTATE.smoothed_3200_6400
+    VSTATE.smoothed_6400_22000 = ALPHA_6400_22000 * lvl_6400_22000 + (1 - ALPHA_6400_22000) * VSTATE.smoothed_6400_22000
 
     # l - left, r - right, t - top, b - bottom
     lr = lg = lb = CONFIG.colors.MIN_VAL
@@ -84,71 +84,127 @@ async def _visualize_side_buttons(
     br = bg = bb = CONFIG.colors.MIN_VAL
 
     # Logic for the left side
-    if VSTATE.smoothed_sub > CONFIG.threshold.LEFT_SUB:
+    if VSTATE.smoothed_0_100 > CONFIG.threshold.LEFT_SUB:
         start_rgb = CONFIG.colors.LEFT_START_RGB
         end_rgb = CONFIG.colors.LEFT_END_RGB
         # Using a smoothed value
-        lr = int(start_rgb[0] + (end_rgb[0] - start_rgb[0]) * VSTATE.smoothed_sub)
-        lg = int(start_rgb[1] + (end_rgb[1] - start_rgb[1]) * VSTATE.smoothed_sub)
-        lb = int(start_rgb[2] + (end_rgb[2] - start_rgb[2]) * VSTATE.smoothed_sub)
+        lr = int(start_rgb[0] + (end_rgb[0] - start_rgb[0]) * VSTATE.smoothed_0_100)
+        lg = int(start_rgb[1] + (end_rgb[1] - start_rgb[1]) * VSTATE.smoothed_0_100)
+        lb = int(start_rgb[2] + (end_rgb[2] - start_rgb[2]) * VSTATE.smoothed_0_100)
     else:
         lr, lg, lb = CONFIG.colors.OFF_COLOR_RGB
 
     # Logic for the right side
-    if VSTATE.smoothed_bass > CONFIG.threshold.RIGHT_BASS:
+    if VSTATE.smoothed_100_200 > CONFIG.threshold.RIGHT_BASS:
         start_rgb = CONFIG.colors.RIGHT_START_RGB
         end_rgb = CONFIG.colors.RIGHT_END_RGB
         # Using a smoothed value
-        rr = int(start_rgb[0] + (end_rgb[0] - start_rgb[0]) * VSTATE.smoothed_bass)
-        rg = int(start_rgb[1] + (end_rgb[1] - start_rgb[1]) * VSTATE.smoothed_bass)
-        rb = int(start_rgb[2] + (end_rgb[2] - start_rgb[2]) * VSTATE.smoothed_bass)
+        rr = int(start_rgb[0] + (end_rgb[0] - start_rgb[0]) * VSTATE.smoothed_100_200)
+        rg = int(start_rgb[1] + (end_rgb[1] - start_rgb[1]) * VSTATE.smoothed_100_200)
+        rb = int(start_rgb[2] + (end_rgb[2] - start_rgb[2]) * VSTATE.smoothed_100_200)
     else:
         rr, rg, rb = CONFIG.colors.OFF_COLOR_RGB
-
-    # Control the upper (green) and lower (orange) buttons
-    # Top buttons (green) - for bass
-    if VSTATE.smoothed_bass > CONFIG.threshold.TOP_BASS and VSTATE.smoothed_sub > CONFIG.threshold.TOP_SUB:
-        tr, tg, tb = CONFIG.colors.TOP_RGB
-    else:
-        tr, tg, tb = CONFIG.colors.MIN_VAL, int(VSTATE.smoothed_bass * CONFIG.colors.MAX_VAL), CONFIG.colors.MIN_VAL
-
-    # Bottom buttons (orange) - for snares
-    if VSTATE.smoothed_high > CONFIG.threshold.BOTTOM_HIGH and VSTATE.smoothed_mid_high > CONFIG.threshold.BOTTOM_MID_HIGH:
-        br, bg, bb = CONFIG.colors.BOTTOM_RGB
-    else:
-        smoothed_combined = (VSTATE.smoothed_high + VSTATE.smoothed_mid_high) / 2
-        br, bg, bb = int(smoothed_combined * CONFIG.colors.MAX_VAL), int(smoothed_combined * CONFIG.colors.MAX_VAL), CONFIG.colors.MIN_VAL
 
     # 2. CACHING AND UPDATING LEDS
 
     # Left side buttons
-    for y in range(CONFIG.pads.LEFT_Y_RANGE[0], CONFIG.pads.LEFT_Y_RANGE[1]):
-        current_color = (lr, lg, lb)
-        cache_index = y - 1 # 0 - 7
-        if VISUAL_SIDE_STATE_CACHE[cache_index] != current_color:
-            lp.LedCtrlXY(CONFIG.pads.LEFT_X_POS, y, lr, lg, lb)
-            VISUAL_SIDE_STATE_CACHE[cache_index] = current_color
+    if CONFIG.pads.TURN_ON_LEFT_BUTTONS:
+        for y in range(CONFIG.pads.LEFT_Y_RANGE[0], CONFIG.pads.LEFT_Y_RANGE[1]):
+            current_color = (lr, lg, lb)
+            cache_index = y - 1
+            if VISUAL_SIDE_STATE_CACHE[cache_index] != current_color:
+                lp.LedCtrlXY(CONFIG.pads.LEFT_X_POS, y, lr, lg, lb)
+                VISUAL_SIDE_STATE_CACHE[cache_index] = current_color
 
     # Right side buttons
-    for y in range(CONFIG.pads.RIGHT_Y_RANGE[0], CONFIG.pads.RIGHT_Y_RANGE[1]):
-        current_color = (rr, rg, rb)
-        cache_index = VSSCACHE_RIGHT_INDEX + (y - 1) # 8 - 15
-        if VISUAL_SIDE_STATE_CACHE[cache_index] != current_color:
-            lp.LedCtrlXY(CONFIG.pads.RIGHT_X_POS, CONFIG.pads.PADS_IN_COLUMN - y + 1, rr, rg, rb)
-            VISUAL_SIDE_STATE_CACHE[cache_index] = current_color
+    if CONFIG.pads.TURN_ON_RIGHT_BUTTONS:
+        for y in range(CONFIG.pads.RIGHT_Y_RANGE[0], CONFIG.pads.RIGHT_Y_RANGE[1]):
+            current_color = (rr, rg, rb)
+            cache_index = VSSCACHE_RIGHT_INDEX + (y - 1)
+            if VISUAL_SIDE_STATE_CACHE[cache_index] != current_color:
+                lp.LedCtrlXY(CONFIG.pads.RIGHT_X_POS, CONFIG.pads.PADS_IN_COLUMN - y + 1, rr, rg, rb)
+                VISUAL_SIDE_STATE_CACHE[cache_index] = current_color
 
     # Top buttons
-    for x in range(CONFIG.pads.TOP_X_RANGE[0], CONFIG.pads.TOP_X_RANGE[1]):
-        current_color = (tr, tg, tb)
-        cache_index = VSSCACHE_TOP_INDEX + x # 16 - 23
-        if VISUAL_SIDE_STATE_CACHE[cache_index] != current_color:
-            lp.LedCtrlXY(x, CONFIG.pads.TOP_Y_POS, tr, tg, tb)
-            VISUAL_SIDE_STATE_CACHE[cache_index] = current_color
+    if CONFIG.pads.TURN_ON_TOP_BUTTONS:
+        # split range into left and right halves
+        left_range = list(range(CONFIG.pads.TOP_X_RANGE[0], (CONFIG.pads.TOP_X_RANGE[0] + CONFIG.pads.TOP_X_RANGE[1]) // 2))
+        right_range = reversed(list(range((CONFIG.pads.TOP_X_RANGE[0] + CONFIG.pads.TOP_X_RANGE[1]) // 2, CONFIG.pads.TOP_X_RANGE[1])))
+
+        left_intensity = VSTATE.smoothed_800_1600
+        right_intensity = VSTATE.smoothed_3200_6400
+        thresholds = CONFIG.threshold.SIDE_HALF_THRESHOLD
+
+        # --- LEFT (example: green-blue tones) ---
+        for i, x in enumerate(left_range):
+            threshold = thresholds[i % len(thresholds)]
+            if left_intensity >= threshold:
+                tr = int(CONFIG.colors.MAX_VAL * (0.3 * left_intensity))
+                tg = int(CONFIG.colors.MAX_VAL * (0.7 * left_intensity))
+                tb = int(CONFIG.colors.MAX_VAL * (0.8 * left_intensity))
+            else:
+                tr = tg = tb = CONFIG.colors.MIN_VAL
+
+            current_color = (tr, tg, tb)
+            cache_index = VSSCACHE_TOP_INDEX + x
+            if VISUAL_SIDE_STATE_CACHE[cache_index] != current_color:
+                lp.LedCtrlXY(x, CONFIG.pads.TOP_Y_POS, tr, tg, tb)
+                VISUAL_SIDE_STATE_CACHE[cache_index] = current_color
+
+        # --- RIGHT (example: purple-pink tones) ---
+        for i, x in enumerate(right_range):
+            threshold = thresholds[i % len(thresholds)]
+            if right_intensity >= threshold:
+                tr = int(CONFIG.colors.MAX_VAL * (0.8 * right_intensity))
+                tg = int(CONFIG.colors.MAX_VAL * (0.3 * right_intensity))
+                tb = int(CONFIG.colors.MAX_VAL * (0.7 * right_intensity))
+            else:
+                tr = tg = tb = CONFIG.colors.MIN_VAL
+
+            current_color = (tr, tg, tb)
+            cache_index = VSSCACHE_TOP_INDEX + x
+            if VISUAL_SIDE_STATE_CACHE[cache_index] != current_color:
+                lp.LedCtrlXY(x, CONFIG.pads.TOP_Y_POS, tr, tg, tb)
+                VISUAL_SIDE_STATE_CACHE[cache_index] = current_color
 
     # Bottom buttons
-    for x in range(CONFIG.pads.BOTTOM_X_RANGE[0], CONFIG.pads.BOTTOM_X_RANGE[1]):
-        current_color = (br, bg, bb)
-        cache_index = VSSCACHE_BOTTOM_INDEX + x # 24 - 31
-        if VISUAL_SIDE_STATE_CACHE[cache_index] != current_color:
-            lp.LedCtrlXY(x, CONFIG.pads.BOTTOM_Y_POS, br, bg, bb)
-            VISUAL_SIDE_STATE_CACHE[cache_index] = current_color
+    # Bottom buttons (split into left and right halves)
+    if CONFIG.pads.TURN_ON_BOTTOM_BUTTONS:
+        mid_range = list(range(CONFIG.pads.BOTTOM_X_RANGE[0], (CONFIG.pads.BOTTOM_X_RANGE[0] + CONFIG.pads.BOTTOM_X_RANGE[1]) // 2))
+        high_range = reversed(list(range((CONFIG.pads.BOTTOM_X_RANGE[0] + CONFIG.pads.BOTTOM_X_RANGE[1]) // 2, CONFIG.pads.BOTTOM_X_RANGE[1])))
+
+        mid_intensity = VSTATE.smoothed_3200_6400
+        thresholds = CONFIG.threshold.SIDE_HALF_THRESHOLD
+
+        for i, x in enumerate(mid_range):
+            threshold = thresholds[i]
+            if mid_intensity >= threshold:
+                br = int(CONFIG.colors.MAX_VAL * mid_intensity)
+                bg = int(CONFIG.colors.MAX_VAL * mid_intensity * 0.6)
+                bb = 0
+            else:
+                br = bg = bb = CONFIG.colors.MIN_VAL
+
+            current_color = (br, bg, bb)
+            cache_index = VSSCACHE_BOTTOM_INDEX + x
+            if VISUAL_SIDE_STATE_CACHE[cache_index] != current_color:
+                lp.LedCtrlXY(x, CONFIG.pads.BOTTOM_Y_POS, br, bg, bb)
+                VISUAL_SIDE_STATE_CACHE[cache_index] = current_color
+
+        # --- RIGHT (high = hats/sibilants) ---
+        high_intensity = VSTATE.smoothed_6400_22000
+        thresholds = CONFIG.threshold.SIDE_HALF_THRESHOLD
+
+        for i, x in enumerate(high_range):
+            threshold = thresholds[i]
+            if high_intensity >= threshold:
+                br = int(CONFIG.colors.MAX_VAL * high_intensity * 0.4)
+                bg = int(CONFIG.colors.MAX_VAL * high_intensity * 0.5)
+                bb = int(CONFIG.colors.MAX_VAL * high_intensity)
+            else:
+                br = bg = bb = CONFIG.colors.MIN_VAL
+            current_color = (br, bg, bb)
+            cache_index = VSSCACHE_BOTTOM_INDEX + x
+            if VISUAL_SIDE_STATE_CACHE[cache_index] != current_color:
+                lp.LedCtrlXY(x, CONFIG.pads.BOTTOM_Y_POS, br, bg, bb)
+                VISUAL_SIDE_STATE_CACHE[cache_index] = current_color

@@ -47,6 +47,11 @@ class PadsConfig:
     LEFT_Y_RANGE = (1, 9)
     RIGHT_Y_RANGE = (1, 9)
 
+    TURN_ON_TOP_BUTTONS: bool = True
+    TURN_ON_BOTTOM_BUTTONS: bool = True
+    TURN_ON_LEFT_BUTTONS: bool = True
+    TURN_ON_RIGHT_BUTTONS: bool = True
+
 @dataclass(frozen=True)
 class ColorConfig:
     # Colors when audio will play
@@ -116,6 +121,10 @@ class ThresholdConfig:
     BOTTOM_MID_HIGH: float = 0.7
     LOW_MID_HIGH: float = 0.7
 
+    SIDE_HALF_THRESHOLD: list[float] = field(init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, 'SIDE_HALF_THRESHOLD', [0.2, 0.3, 0.6, 0.7])
 
 
 # =====================
