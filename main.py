@@ -2,6 +2,7 @@ import cProfile
 import pstats
 import asyncio
 import argparse
+from datetime import datetime
 import numpy as np
 import launchpad_py as launchpad
 from asyncstdlib import enumerate as aenumerate
@@ -10,7 +11,7 @@ from core.laucnhpad_visualization import visualize_audio_bands
 from utils.general import find_opened_port
 from utils.logger import logger
 from core.capture_audio import capture_audio, handle_chunk
-from core.state import reset_state, STATE_RESETTED
+from core.state import reset_state, STATE_RESETTED, GLOBAL_PAUSE_START_TIME
 from core.constants import PSYCHOACOUSTIC_WEIGHTS
 
 def process_audio_chunk(
@@ -80,7 +81,7 @@ def normalize_bands(bands_rms: np.ndarray):
     return brightness
 
 async def play_and_visualize(lp, chunk_size: int = 1024, hanning_window: np.ndarray = np.hanning(1024)):
-    global CONFIG, STATE_RESETTED
+    global CONFIG, STATE_RESETTED, GLOBAL_PAUSE_START_TIME
 
     async for i, audio_b in aenumerate(capture_audio(chunk_size)):
         chunk = handle_chunk(audio_b)
@@ -96,17 +97,32 @@ async def play_and_visualize(lp, chunk_size: int = 1024, hanning_window: np.ndar
                     # if the state was resetted, set it to False one time
                     if STATE_RESETTED is not False:
                         STATE_RESETTED = False
+
+                    # Reset the pause timer, since the signal is back
+                    if GLOBAL_PAUSE_START_TIME is not None:
+                        GLOBAL_PAUSE_START_TIME = None
                 else:
-                    # if the bands rms is empty, reset the state
-                    if not STATE_RESETTED:
-                        logger.info("Resetting state...")
-                        reset_state()
-                        await visualize_audio_bands(lp, [0.0] * len(CONFIG.bands.RANGE))
-                        lp.Reset()
-                        logger.info("State resetted.")
-                        STATE_RESETTED = True
+                    # No signal, start or continue the pause countdown
+                    if GLOBAL_PAUSE_START_TIME is None:
+                        # First moment of silence, start the timer
+                        GLOBAL_PAUSE_START_TIME = datetime.now()
+                        logger.info(f"Signal lost. Starting {CONFIG.threshold.PAUSE_THRESHOLD_TO_RESET_STATE.total_seconds()} second countdown to reset.")
+
+                    # Check if the pause threshold has been exceeded
+                    if (datetime.now() - GLOBAL_PAUSE_START_TIME) >= CONFIG.threshold.PAUSE_THRESHOLD_TO_RESET_STATE:
+                        # If the state is not already resetted, reset it now
+                        if not STATE_RESETTED:
+                            logger.info(f"{CONFIG.threshold.PAUSE_THRESHOLD_TO_RESET_STATE.total_seconds()} second pause detected. Resetting state...")
+                            reset_state()
+                            await visualize_audio_bands(lp, [0.0] * len(CONFIG.bands.RANGE))
+                            lp.Reset()
+                            logger.info("State resetted.")
+                            STATE_RESETTED = True
+                        else:
+                            # State is already resetted, wait for the new input signal
+                            await asyncio.sleep(0.01)
                     else:
-                        # wait for the new input signal
+                        # Still in the second pause, just wait
                         await asyncio.sleep(0.01)
 
 def main():

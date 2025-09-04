@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from functools import cached_property
+from datetime import timedelta
 
 # =====================
 # CONFIG DATACLASSES
@@ -122,6 +123,8 @@ class ThresholdConfig:
     LOW_MID_HIGH: float = 0.7
 
     SIDE_HALF_THRESHOLD: list[float] = field(init=False)
+
+    PAUSE_THRESHOLD_TO_RESET_STATE: timedelta = timedelta(seconds=0.25)
 
     def __post_init__(self):
         object.__setattr__(self, 'SIDE_HALF_THRESHOLD', [0.2, 0.3, 0.6, 0.7])

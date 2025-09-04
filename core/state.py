@@ -31,18 +31,18 @@ VSSCACHE_TOP_INDEX = 16
 VSSCACHE_BOTTOM_INDEX = 24
 
 STATE_RESETTED = True
-STATE_RESETTED_COUNTDOWN = timedelta(seconds=2)
-STATE_RESETTED_DATETIME = datetime.now() + STATE_RESETTED_COUNTDOWN
+GLOBAL_PAUSE_START_TIME = None
+STATE_RESETTED_DATETIME = None
 
 def reset_state():
-    global BANDS_POS, VISUAL_SIDE_STATE_CACHE, STATE_RESETTED, STATE_RESETTED_DATETIME, VSTATE
+    global BANDS_POS, VISUAL_SIDE_STATE_CACHE, STATE_RESETTED, STATE_RESETTED_DATETIME, VSTATE, GLOBAL_PAUSE_START_TIME
 
     if STATE_RESETTED:
         logger.debug("State is already resetted.")
         return False
 
     if STATE_RESETTED_DATETIME > datetime.now():
-        logger.debug("State not resetted because it was resetted less than %s seconds ago", STATE_RESETTED_COUNTDOWN.total_seconds())
+        logger.debug("State not resetted because it was resetted less than %s seconds ago", CONFIG.threshold.PAUSE_THRESHOLD_TO_RESET_STATE.total_seconds())
         return False
 
     logger.info("Resetting state...")
@@ -51,7 +51,8 @@ def reset_state():
     VISUAL_SIDE_STATE_CACHE = [(0, 0, 0) for _ in VISUAL_SIDE_STATE_CACHE]
 
     STATE_RESETTED = True
-    STATE_RESETTED_DATETIME = datetime.now() + STATE_RESETTED_COUNTDOWN
+    STATE_RESETTED_DATETIME = datetime.now()
+    GLOBAL_PAUSE_START_TIME = None
 
     # TODO: change from config to constants
     logger.debug("Resetting state...")

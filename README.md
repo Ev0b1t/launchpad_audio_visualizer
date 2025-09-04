@@ -74,6 +74,32 @@ Individual control for each side button group with advanced features:
 - **RIGHT_BASS (0.5)**: Bass frequencies (100-200Hz) with gradient colors
 - **Split-zone processing**: Each half responds to different frequency ranges for more detailed visualization
 
+### **⏸️ Automatic State Reset - Pause Detection**
+The system includes intelligent pause detection that automatically resets the visualization when audio stops:
+
+- **PAUSE_THRESHOLD_TO_RESET_STATE**: `timedelta(seconds=0.25)` - Configurable pause duration before state reset
+- **Smart detection**: When no audio signal is detected, starts a countdown timer
+- **Automatic cleanup**: After the threshold time, all LEDs are cleared and internal state is reset
+- **Seamless restart**: When audio resumes, visualization starts fresh without residual lighting
+
+**How it works:**
+1. Audio signal stops → Timer starts counting
+2. If signal returns before threshold → Timer resets, no action taken
+3. If pause exceeds 0.25 seconds → All LEDs cleared, state reset
+4. New audio automatically restarts visualization
+
+**User Control:**
+```python
+# In core/config.py - ThresholdConfig
+PAUSE_THRESHOLD_TO_RESET_STATE: timedelta = timedelta(seconds=0.25)
+
+# Examples of different pause times:
+timedelta(seconds=0.1)   # Very quick reset (100ms)
+timedelta(seconds=0.5)   # Half-second pause
+timedelta(seconds=1.0)   # One second pause
+timedelta(seconds=2.0)   # Two second pause for longer breaks
+```
+
 ## 🎮 Visualization Zones
 
 ### Main Pad Grid (8x7) (as indexes)
